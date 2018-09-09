@@ -1,0 +1,30 @@
+#Script was made from script posted at https://forum.mikrotik.com/viewtopic.php?p=444181#p444181 by LESHIYODESSA
+#in order to add feature to add address=$ip parameter to direct url.
+#This could be useful if we have multiple intefaces with freedns bindings 
+
+:local "direct-url" "http://freedns.afraid.org/dynamic/update.php?U2JSffVySVhrdGhtYU1JNkhnMDzzdzBmOjE3NzYxMjQx"
+:local "api-url" "http://freedns.afraid.org/api/\?action=getdyndns&v=2&sha=e4de4db68067b9ba4773c789dd8a0de3493b2598"
+:local "dns-domain" "example.verymad.net"
+:local "out_interface" "ether1"
+:local "write_log" true
+
+:local "current_ip"  [/ip address get [find interface=$"out_interface"] address]
+:set "current_ip" [:pick $"current_ip" 0 [:find $"current_ip" "/"]]
+
+/tool fetch url=$"api-url" dst-path="/freedns2.txt"
+:local "result" [/file get freedns2.txt contents]
+:local "startloc" ([:find $"result" $"dns-domain"] + ([:len $"dns-domain"] + 1))
+:local "endloc" ([:find $"result" $"direct-url" -1] -1)
+:local "dns-domain-ip" [:pick $"result" $"startloc" $"endloc"]
+
+:if ($"current_ip" != $"dns-domain-ip") do={
+:set "direct-url"  ($"direct-url" . "&address=" . $"current_ip")
+/ tool fetch url=$"direct-url"  keep-result=no
+:if ($"write_log") do={
+/log info message="Updated freedns  $"dns-domain" from $"dns-domain-ip" to $"current_ip" due to ip address change on interface $"out_interface""
+}
+} else= {
+:if ($"write_log") do={
+/log info message="freedns  $"dns-domain" left unchanged because IP address on interface $"out_interface" did not change"
+}
+}
